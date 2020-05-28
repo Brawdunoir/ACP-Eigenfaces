@@ -1,6 +1,6 @@
 # ACP for recognition "Eigenfaces"
 
-_NB: Some ressources are in French_
+_NB: Some ressources are in French._
 
 ## Topic
 This topic was to study the ACP principle in the context of data analysis and scientific computation (in particular in the search for matrix eigenvalues).
@@ -19,7 +19,7 @@ TP2 is about different methods to compute matrix engenvalues. Especially the pow
 It uses Fortran 90 and Matlab code.
 
 ### TP3
-TP3 reachs the final goal and deals with Engeifaces
+TP3 reachs the final goal and deals with Engeifaces.
 
 It uses Matlab code.
 
