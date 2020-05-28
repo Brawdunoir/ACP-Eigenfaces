@@ -1,0 +1,304 @@
+clear all;clc
+% tolérance
+eps = 1e-8;
+% nombre d'iterations max pour atteindre la convergence (si i > maxit, l'algo échoue)
+maxit = 500; 
+
+% Géneration d'une matrice rectangulaire aléatoire A de taille (n x p)
+n = 1000; p = 50;
+% nombre de valeurs propres cherchées (m) 
+m = 40;
+% ré-initialisation du générateur aléatoire (enlever ligne pour avoir une
+% matrice différente à chaque appel
+randn('state', 0);
+
+A = 5*randn(n,p);
+% AAt, AtA : équations normales de la matrice A
+AAt = A*A';
+AtA = A'*A;
+
+
+
+% appel a eig de matlab : calcul de toutes les valeurs propres
+t_v =  cputime;
+[VA, DA] = eig(AAt);
+t_v = cputime-t_v;
+fprintf('eig : Temps eig = %0.3e\n',t_v);
+[WA, indices] = sort(diag(DA), 'descend');
+VA = VA(:, indices);
+
+% test avec votre puissance itérée
+
+t_vPI =  cputime;
+V1 = rand(n, m);
+V1 = mgs(V1);
+
+WPI = zeros(m,1);
+Vout1 = zeros(n,m);
+
+for j = 1:m
+    cv = false;
+    k1 = 0;
+    err1 = 0;
+    x = V1(:,j);
+    x= x/norm(x);
+    lambda = x'*AAt*x;
+    
+    
+    while(~cv)
+   
+        mu1 = lambda;
+        x = AAt*x;
+        x = x/norm(x);
+        lambda = x'*AAt*x;
+        k1 = k1 + 1;
+        err1 = abs((lambda-mu1)/abs(mu1));
+        cv = or(k1 > maxit, err1 < eps);
+    end
+    
+    WPI(j,1) = lambda;
+    Vout1(:,j) = x;
+    
+end
+
+[WPI, indice] = sort(WPI, 'descend');
+VPI = Vout1(:, indice);
+
+qPI = norm(WPI - WA(1:m))/norm(WA);
+
+
+for i = 1:m
+    qvPI(i) = norm(AAt*VPI(:,i) - WPI(i)*VPI(:,i))/norm(WPI(i));
+end
+
+fprintf('iterPI : Temps vPI = %0.3e\n',t_vPI);
+fprintf('iterPI : Qualité de la solution valeurs propres / eig = %0.3e\n',qPI);
+fprintf('iterPI : Qualité de la solution couple propres = [%0.3e - %0.3e]\n', min(qvPI), max(qvPI));
+
+t_vPI = cputime-t_vPI;
+
+
+% ou taille du sous-espace (V1 et v2)
+
+
+% pour comparer les différentes versions 
+% on veut  que le V (généré aléatoirement) soit le même
+% on sauvegarde la valeur du générateur aléatoire
+s = rng;
+
+t_v0 =  cputime;
+[W0, V0, it1, flag0] = subspace_iter_v0(AAt, m, eps, maxit);
+t_v0 = cputime-t_v0;
+q0 = norm(W0 - WA(1:m))/norm(WA);
+flag0
+
+for i = 1:m
+    qv0(i) = norm(AAt*V0(:,i) - W0(i)*V0(:,i))/norm(W0(i));
+end
+
+fprintf('iter0 : Temps v0 = %0.3e\n',t_v0);
+fprintf('iter0 : Qualité de la solution valeurs propres / eig = %0.3e\n',q0);
+fprintf('iter0 : Qualité de la solution couple propres = [%0.3e - %0.3e]\n', min(qv0), max(qv0));
+
+
+% pourcentage de la trace que l'on veut atteindre
+percentage = 0.99;
+
+% on ré-initialise la valeur du générateur aléatoire avec la valeur sauvée
+rng(s);
+
+t_v1 =  cputime;
+[ W1, V1, n_ev1, k1, flag1 ] = subspace_iter_v1( AAt, m, percentage, eps, maxit );
+t_v1 = cputime-t_v1;
+
+q1 =  norm(W1 - WA(1:n_ev1))/norm(WA);
+
+
+for i = 1:n_ev1
+    qv1(i) = norm(AAt*V1(:,i) - W1(i)*V1(:,i))/norm(W1(i));
+end
+
+fprintf('iter1 : Temps v1 = %0.3e\n',t_v1);
+fprintf('iter1 : Qualité de la solution valeurs propres / eig = %0.3e\n',q1);
+fprintf('iter1 : Qualité de la solution couple propres = [%0.3e - %0.3e]\n', min(qv1), max(qv1));
+
+% on ré-initialise la valeur du générateur aléatoire avec la valeur sauvée
+rng(s);
+
+% nombre de produits par itération (approche bloc)
+nbprod = 5;
+t_v2 =  cputime;
+[ W2, V2, n_ev2, k2, flag2 ] = subspace_iter_v2( AAt, m, percentage, nbprod, eps, maxit );
+t_v2 = cputime-t_v2;
+q2 = norm(W2 - WA(1:n_ev2))/norm(WA);
+n_ev2
+k2
+flag2
+for i = 1:n_ev2
+    qv2(i) = norm(AAt*V2(:,i) - W2(i)*V2(:,i))/norm(W2(i));
+end
+fprintf('iter2 : Temps v2 = %0.3e\n', t_v2);
+fprintf('iter2 : Qualité de la solution valeurs propres / eig = %0.3e\n',q2);
+fprintf('iter2 : Qualité de la solution couple propres = [%0.3e - %0.3e]\n', min(qv2), max(qv2));
+
+% on ré-initialise la valeur du générateur aléatoire avec la valeur sauvée
+rng(s);
+
+% nombre de produits par itération (approche bloc)
+nbprod = 5;
+t_v3 =  cputime;
+[ W3, V3, n_ev3, k3, flag3 ] = subspace_iter_v3( AAt, m, percentage, nbprod, eps, maxit );
+t_v3 = cputime-t_v3;
+q3 = norm(W3 - WA(1:n_ev3))/norm(WA);
+n_ev3
+k3
+flag3
+for i = 1:n_ev3
+    qv3(i) = norm(AAt*V3(:,i) - W2(i)*V3(:,i))/norm(W3(i));
+end
+fprintf('iter3 : Temps v3 = %0.3e\n', t_v3);
+fprintf('iter3 : Qualité de la solution valeurs propres / eig = %0.3e\n',q3);
+fprintf('iter3 : Qualité de la solution couple propres = [%0.3e - %0.3e]\n', min(qv3), max(qv3));
+
+%% même chose avec AtA
+fprintf('\n En utilisant AtA au lieu de AAt\n')
+
+% appel a eig de matlab : calcul de toutes les valeurs propres
+t_v =  cputime;
+[VA, DA] = eig(AtA);
+t_v = cputime-t_v;
+fprintf('\neig : Temps eig = %0.3e\n',t_v);
+[WA, indices] = sort(diag(DA), 'descend');
+VA = VA(:, indices);
+
+% test avec votre puissance itérée
+
+t_vPI =  cputime;
+V1 = rand(p, m);
+V1 = mgs(V1);
+
+WPI = zeros(m,1);
+Vout1 = zeros(p,m);
+
+for j = 1:m
+    cv = false;
+    k1 = 0;
+    err1 = 0;
+    x = V1(:,j);
+    x= x/norm(x);
+    lambda = x'*AtA*x;
+    
+    while(~cv)
+   
+        mu1 = lambda;
+        x = AtA*x;
+        x = x/norm(x);
+        lambda = x'*AtA*x;
+        k1 = k1 + 1;
+        err1 = abs((lambda-mu1)/abs(mu1));
+        cv = or(k1 > maxit, err1 < eps);
+    end
+    
+    WPI(j,1) = lambda;
+    Vout1(:,j) = x;
+    
+end
+
+[WPI, indice] = sort(WPI, 'descend');
+VPI = Vout1(:, indice);
+
+qPI = norm(WPI - WA(1:m))/norm(WA);
+
+
+for i = 1:m
+    qvPI(i) = norm(AtA*VPI(:,i) - WPI(i)*VPI(:,i))/norm(WPI(i));
+end
+
+fprintf('iterPI : Temps vPI = %0.3e\n',t_vPI);
+fprintf('iterPI : Qualité de la solution valeurs propres / eig = %0.3e\n',qPI);
+fprintf('iterPI : Qualité de la solution couple propres = [%0.3e - %0.3e]\n', min(qvPI), max(qvPI));
+
+t_vPI = cputime-t_vPI;
+
+% pour comparer les différentes versions 
+% on veut  que le V (généré aléatoirement) soit le même
+% on sauvegarde la valeur du générateur aléatoire
+s = rng;
+
+t_v02 =  cputime;
+[W02, V02, it02, flag02] = subspace_iter_v0(AtA, m, eps, maxit);
+t_v02 = cputime-t_v02;
+q02 = norm(W02 - WA(1:m))/norm(WA);
+flag02
+
+for i = 1:m
+    qv02(i) = norm(AtA*V02(:,i) - W02(i)*V02(:,i))/norm(W02(i));
+end
+
+fprintf('iter0 : Temps v0 = %0.3e\n',t_v02);
+fprintf('iter0 : Qualité de la solution valeurs propres / eig = %0.3e\n',q02);
+fprintf('iter0 : Qualité de la solution couple propres = [%0.3e - %0.3e]\n', min(qv02), max(qv02));
+
+
+% pourcentage de la trace que l'on veut atteindre
+
+
+% on ré-initialise la valeur du générateur aléatoire avec la valeur sauvée
+rng(s);
+
+t_v12 =  cputime;
+[ W12, V12, n_ev12, k12, flag1 ] = subspace_iter_v1( AtA, m, percentage, eps, maxit );
+t_v1 = cputime-t_v1;
+
+q1 =  norm(W1 - WA(1:n_ev1))/norm(WA);
+n_ev1
+k1
+flag1
+
+for i = 1:n_ev1
+    qv1(i) = norm(AtA*V1(:,i) - W1(i)*V1(:,i))/norm(W1(i));
+end
+
+fprintf('iter1 : Temps v1 = %0.3e\n',t_v1);
+fprintf('iter1 : Qualité de la solution valeurs propres / eig = %0.3e\n',q1);
+fprintf('iter1 : Qualité de la solution couple propres = [%0.3e - %0.3e]\n', min(qv1), max(qv1));
+
+% on ré-initialise la valeur du générateur aléatoire avec la valeur sauvée
+rng(s);
+
+% nombre de produits par itération (approche bloc)
+nbprod = 5;
+t_v2 =  cputime;
+
+[ W2, V2, n_ev2, k2, flag2 ] = subspace_iter_v2( AtA, m, percentage, nbprod, eps, maxit );
+t_v2 = cputime-t_v2;
+q2 = norm(W2 - WA(1:n_ev2))/norm(WA);
+n_ev2
+k2
+flag2
+for i = 1:n_ev2
+    qv2(i) = norm(AtA*V2(:,i) - W2(i)*V2(:,i))/norm(W2(i));
+end
+fprintf('iter2 : Temps v2 = %0.3e\n', t_v2);
+fprintf('iter2 : Qualité de la solution valeurs propres / eig = %0.3e\n',q2);
+fprintf('iter2 : Qualité de la solution couple propres = [%0.3e - %0.3e]\n', min(qv2), max(qv2));
+
+% on ré-initialise la valeur du générateur aléatoire avec la valeur sauvée
+rng(s);
+
+% nombre de produits par itération (approche bloc)
+nbprod = 5;
+t_v3 =  cputime;
+[ W3, V3, n_ev3, k3, flag3 ] = subspace_iter_v3( AtA, m, percentage, nbprod, eps, maxit );
+t_v3 = cputime-t_v3;
+q3 = norm(W3 - WA(1:n_ev3))/norm(WA);
+n_ev3
+k3
+flag3
+for i = 1:n_ev3
+    qv3(i) = norm(AtA*V3(:,i) - W2(i)*V3(:,i))/norm(W3(i));
+end
+fprintf('iter3 : Temps v3 = %0.3e\n', t_v3);
+fprintf('iter3 : Qualité de la solution valeurs propres / eig = %0.3e\n',q3);
+fprintf('iter3 : Qualité de la solution couple propres = [%0.3e - %0.3e]\n', min(qv3), max(qv3));
+
